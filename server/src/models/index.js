@@ -5,19 +5,31 @@ const path = require('path');
 // Load environment variables
 require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
 
-const env = process.env.NODE_ENV || 'development';
-const config = require('../config/database.js')[env];
+const dbConfigs = require('../config/database.js');
+const env = (process.env.NODE_ENV || 'development').trim();
+const config = dbConfigs[env] || dbConfigs.production || dbConfigs.development || {};
 
 let sequelize;
 
-// In production, use DATABASE_URL (provided by Railway, Render, Neon, etc.)
-if (config.use_env_variable) {
+// If a DATABASE_URL is provided (Render, Neon, Railway, Vercel), connect directly with SSL
+if (process.env.DATABASE_URL) {
+  sequelize = new Sequelize(process.env.DATABASE_URL, {
+    dialect: 'postgres',
+    logging: false,
+    dialectOptions: {
+      ssl: {
+        require: true,
+        rejectUnauthorized: false,
+      },
+    },
+  });
+} else if (config.use_env_variable && process.env[config.use_env_variable]) {
   sequelize = new Sequelize(process.env[config.use_env_variable], config);
 } else {
   sequelize = new Sequelize(
-    config.database,
-    config.username,
-    config.password,
+    config.database || 'bug_tracker',
+    config.username || 'postgres',
+    config.password || 'postgres',
     config
   );
 }
